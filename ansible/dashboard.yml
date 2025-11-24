@@ -1,0 +1,98 @@
+- name: Установка Kubernetes Dashboard с внешним доступом
+  hosts: K8S-master
+  become: true
+
+  vars:
+    kubeconfig_path: /etc/kubernetes/admin.conf
+    dashboard_version: v2.7.0
+    dashboard_namespace: kubernetes-dashboard
+    dashboard_nodeport: 30443   # порт на ноде (30000–32767)
+    dashboard_host_ip: 89.169.142.199   # Вынесенный IP-адрес
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Установить Kubernetes Dashboard (recommended.yaml)
+      command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - "https://raw.githubusercontent.com/kubernetes/dashboard/{{ dashboard_version }}/aio/deploy/recommended.yaml"
+
+    - name: Дождаться, пока Dashboard поды запустятся
+      command:
+        argv:
+          - kubectl
+          - -n
+          - "{{ dashboard_namespace }}"
+          - rollout
+          - status
+          - deployment/kubernetes-dashboard
+          - --timeout=120s
+
+    - name: Создать ServiceAccount для админа Dashboard
+      copy:
+        dest: /tmp/dashboard-admin-sa.yaml
+        mode: '0644'
+        content: |
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: dashboard-admin
+            namespace: {{ dashboard_namespace }}
+      register: sa_manifest
+
+    - name: Применить ServiceAccount
+      command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - /tmp/dashboard-admin-sa.yaml
+      when: sa_manifest is changed
+
+    - name: Создать ClusterRoleBinding для admin-доступа Dashboard
+      copy:
+        dest: /tmp/dashboard-admin-crb.yaml
+        mode: '0644'
+        content: |
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: dashboard-admin-binding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+            - kind: ServiceAccount
+              name: dashboard-admin
+              namespace: {{ dashboard_namespace }}
+      register: crb_manifest
+
+    - name: Применить ClusterRoleBinding
+      command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - /tmp/dashboard-admin-crb.yaml
+      when: crb_manifest is changed
+
+    - name: Переключить сервис Dashboard в NodePort
+      command: >
+        kubectl -n {{ dashboard_namespace }} patch service kubernetes-dashboard -p "{\"spec\":{\"type\":\"NodePort\",\"ports\":[{\"port\":443,\"targetPort\":8443,\"nodePort\":{{ dashboard_nodeport }}}]}}"
+
+    - name: Получить токен для входа в Dashboard
+      command: kubectl -n {{ dashboard_namespace }} create token dashboard-admin
+      register: dashboard_token
+      changed_when: false
+
+    - name: Показать URL и токен для входа
+      debug:
+        msg:
+          - "Откройте в браузере: https://{{ dashboard_host_ip }}:{{ dashboard_nodeport }}"
+          - "Токен для входа в Dashboard:"
+          - "{{ dashboard_token.stdout }}"
