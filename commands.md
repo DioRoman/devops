@@ -56,4 +56,4 @@
 - Применить Flannel:
   - `kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml`
 - Присоединить worker (через Ansible):
-  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token ... --discovery-token-ca-cert-hash sha256:...'"`
+  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token h4poj4.i24kgkc3v182pcfh --discovery-token-ca-cert-hash sha256:6a0d43d8f'"`

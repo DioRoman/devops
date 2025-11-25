@@ -3,7 +3,7 @@
   become: true
 
   vars:
-    kube_join_command: "kubeadm join k8s-master:6443 --token 7xqabo.sp3it1srq6kfbhcf --discovery-token-ca-cert-hash sha256:35d035a3130c04cf78817e6dac8b5440fcbce83e476be2a5695b0b7996f3b6b5"   # Передается через extra-vars или через set_fact после получения с master
+    kube_join_command: ""   # Передается через extra-vars или через set_fact после получения с master
     ansible_user: ubuntu
 
   tasks:
@@ -168,12 +168,19 @@
       ignore_errors: true
 
     # --- JOIN TO CLUSTER ---
-    - name: Присоединить узел к кластеру (kubeadm join)
+    - name: Получить список узлов кластера
+      command: kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
+      register: cluster_nodes
+      failed_when: false
+      changed_when: false
+      when: kube_join_command != ""
+
+    - name: Присоединить узел к кластеру (kubeadm join), если узел отсутствует в кластере
       shell: "{{ kube_join_command }} --ignore-preflight-errors=all"
       args:
         creates: /etc/kubernetes/kubelet.conf
-      when: kube_join_command != ""
-
+      when: kube_join_command != "" and inventory_hostname not in cluster_nodes.stdout.split()
+      
     - name: Проверка присоединения узла (kubectl get nodes)
       command: kubectl get nodes
       register: nodes_check
