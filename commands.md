@@ -57,3 +57,6 @@
   - `kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml`
 - Присоединить worker (через Ansible):
   - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token h4poj4.i24kgkc3v182pcfh --discovery-token-ca-cert-hash sha256:6a0d43d8f'"`
+
+docker build -t my-horoscope-app .
+docker run -p 8080:80 my-horoscope-app
