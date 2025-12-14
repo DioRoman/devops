@@ -1,0 +1,129 @@
+---
+- name: Подключение к Kubernetes кластеру (с /etc/hosts)
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  become: no
+  
+  vars:
+    master_ip: "89.169.150.50"
+    master_user: "ubuntu"
+    kube_dir: "/home/{{ ansible_user_id }}/.kube"
+    kube_config: "{{ kube_dir }}/config"
+    hosts_entry: "{{ master_ip }} k8s-master"
+
+  tasks:
+    - name: Создать директорию .kube
+      file:
+        path: "{{ kube_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Получить существующие записи k8s-master в hosts
+      shell: grep -n "k8s-master" /etc/hosts || echo ""
+      register: hosts_existing
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Скопировать kubeconfig с мастера
+      shell: |
+        mkdir -p "{{ kube_dir }}"
+        scp -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            {{ master_user }}@{{ master_ip }}:/etc/kubernetes/admin.conf "{{ kube_config }}" || \
+        scp -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            {{ master_user }}@{{ master_ip }}:"/home/{{ master_user }}/.kube/config" "{{ kube_config }}" || \
+        echo "Не удалось скопировать kubeconfig"
+        chmod 600 "{{ kube_config }}" 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      register: kube_copy
+      ignore_errors: yes
+
+    - name: Проверить kubeconfig
+      stat:
+        path: "{{ kube_config }}"
+      register: kubeconfig_stat
+      changed_when: false
+
+    - name: Очистить старые k8s-master записи
+      shell: |
+        sudo sed -i '/k8s-master/d' /etc/hosts
+      when: hosts_existing.stdout_lines | length > 0
+      become: yes
+      register: cleanup_hosts
+
+    - name: Добавить новую запись k8s-master
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ hosts_entry }}"
+        regexp: '^{{ master_ip }}\s+'
+        state: present
+      become: yes
+      register: add_entry
+
+    - name: Проверить запись в hosts
+      shell: |
+        if grep -q "{{ master_ip }}.*k8s-master" /etc/hosts; then
+          echo "OK"
+        else
+          echo "FAILED"
+        fi
+      register: hosts_check
+      changed_when: false
+
+    - name: Проверить кластер (nodes -o wide)
+      shell: kubectl get nodes -o wide 2>/dev/null || echo "Кластер недоступен"
+      environment:
+        KUBECONFIG: "{{ kube_config }}"
+      register: cluster_nodes
+      changed_when: false
+      become: no
+
+    - name: Показать результаты
+      debug:
+        msg:
+          - " ПОДКЛЮЧЕНИЕ ЗАВЕРШЕНО!"
+          - " Kubeconfig: {{ kube_config }} "
+          - " /etc/hosts: {{ hosts_entry }} "
+          - "НОДЫ КЛАСТЕРА (kubectl get nodes -o wide):"
+          - "{{ cluster_nodes.stdout_lines }}"
+
+    - name: Сохранить инструкции
+      copy:
+        content: |
+          # Kubernetes Cluster Access -  ГОТОВО!
+          =====================================
+          
+           Kubeconfig: {{ kube_config }}
+           /etc/hosts: {{ hosts_entry }}
+          
+          {% if cluster_nodes.rc == 0 %}
+           Кластер подключен!
+          {{ cluster_nodes.stdout }}
+          {% else %}
+           Кластер недоступен
+          {{ cluster_nodes.stdout }}
+          {% endif %}
+          
+           Команды:
+          source ~/.bashrc
+          k8s-nodes    # kubectl get nodes -o wide
+          
+          Создано: {{ ansible_date_time.iso8601 }}
+        dest: ~/k8s-cluster-access.txt
+        mode: '0644'
+
+    - name: Добавить алиасы в bashrc
+      blockinfile:
+        path: "{{ ansible_user_dir }}/.bashrc"
+        block: |
+          # Kubernetes Cluster (auto-configured {{ ansible_date_time.date }})
+          export KUBECONFIG="{{ kube_config }}"
+          alias k8s="kubectl"
+          alias k8s-nodes="kubectl get nodes -o wide"
+          alias k8s-all="kubectl get all -A"
+          alias k8s-pods="kubectl get pods -A"
+        marker: "# {mark} K8S AUTO-CONFIG {{ ansible_date_time.date }}"
+        create: yes

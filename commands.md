@@ -18,9 +18,12 @@
 - Установить master-узел:
   - `ansible-playbook -i inventories/hosts.yml install-master.yml`
 - Установить worker-узлы:
-  - `ansible-playbook -i inventories/hosts.yml install-node.yml`
+  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token t2i8c1.enedg87zcpa2cpjc --discovery-token-ca-cert-hash sha256:7952fdb832b4a337a9f755956790005657c5d20b00d9e11e0fb6b78f4cfd6b58'"`
 - Установить dashboard:
   - `ansible-playbook -i inventories/hosts.yml dashboard.yml`
+- Подключиться к кластеру локально:
+  - `ansible-playbook -i inventories/hosts.yml localhost-connect-k8s-cluster.yml --ask-become-pass`
+  
 
 ***
 
@@ -56,4 +59,43 @@
 - Применить Flannel:
   - `kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml`
 - Присоединить worker (через Ansible):
-  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token h4poj4.i24kgkc3v182pcfh --discovery-token-ca-cert-hash sha256:6a0d43d8f'"`
+  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token dpencc.djfyv2om1tljpdps --discovery-token-ca-cert-hash sha256:d75b3e798e04826d3c4528883ce03ffe9c0592acca248c959f71120463ea3fd8'"`
+
+### Добавление кластера
+mkdir /home/dio/.kube/
+scp ubuntu@158.160.104.6:/home/ubuntu/.kube/config ~/.kube/config
+chmod 600 ~/.kube/config
+sudo mcedit /etc/hosts
+158.160.104.6 k8s-master
+kubectl get nodes
+
+# Установите kube-prometheus-stack в namespace monitoring
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace \
+  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false
+
+### Основные команды для работы
+
+- **Проверка статуса подов:**
+  ```bash
+  kubectl --namespace monitoring get pods -l "release=prometheus"
+  ```
+
+- **Получение пароля администратора Grafana:**
+  ```bash
+  kubectl --namespace monitoring get secrets prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+  ```
+
+- **Доступ к Grafana через port-forward:**
+  ```bash
+  export POD_NAME=$(kubectl --namespace monitoring get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=prometheus" -o name)
+  kubectl --namespace monitoring port-forward $POD_NAME 3000
+  ```
+  После выполнения откройте в браузере `http://localhost:3000` и используйте полученный пароль.
+
+- **Получение пароля администратора (альтернативный способ):**
+  ```bash
+  kubectl get secret --namespace monitoring -l app.kubernetes.io/component=admin-secret -o jsonpath="{.items[0].data.admin-password}" | base64 --decode ; echo
+  ```

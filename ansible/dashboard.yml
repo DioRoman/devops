@@ -1,60 +1,167 @@
-- name: Установка Kubernetes Dashboard
+---
+- name: Установка Kubernetes Dashboard и Monitoring Stack (Оптимизировано)
   hosts: K8S-master
   become: true
-
+  gather_facts: yes
+  
   vars:
     kubeconfig_path: /etc/kubernetes/admin.conf
     dashboard_namespace: kubernetes-dashboard
     dashboard_nodeport: 30443
-    dashboard_host_ip: 89.169.158.226
+    monitoring_namespace: monitoring
 
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 
   tasks:
-    - name: Установить Helm
+    - name: Установить Python зависимости для системного интерпретатора
+      shell: |
+        apt update
+        apt install -y python3-pip python3-dev
+        /usr/bin/python3.12 -m pip install --break-system-packages kubernetes openshift || true
+      become: yes
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Проверить наличие Helm
+      command: helm version --client
+      register: helm_check
+      changed_when: false
+      failed_when: false
+
+    - name: Установить Helm если отсутствует
       shell: |
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       args:
         executable: /bin/bash
-      when: not ansible_facts['helm_installed'] | default(false)
+      when: helm_check.rc != 0
 
-    - name: Удалить старый Dashboard если существует
-      command: helm uninstall kubernetes-dashboard --namespace {{ dashboard_namespace }}
-      ignore_errors: yes
+    - name: Добавить и обновить Helm репозитории
+      shell: |
+        helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ || true
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+        helm repo update
+      args:
+        executable: /bin/bash
+      changed_when: false
 
-    - name: Добавить репозиторий Dashboard
-      command: helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+    - name: Установить Kubernetes Dashboard
+      kubernetes.core.helm:
+        name: kubernetes-dashboard
+        chart_ref: kubernetes-dashboard/kubernetes-dashboard
+        release_namespace: "{{ dashboard_namespace }}"
+        create_namespace: true
+        state: present
 
-    - name: Обновить репозитории
-      command: helm repo update
+    - name: Настроить NodePort для Dashboard
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: kubernetes-dashboard-kong-proxy
+            namespace: "{{ dashboard_namespace }}"
+          spec:
+            type: NodePort
+            ports:
+            - port: 443
+              nodePort: "{{ dashboard_nodeport }}"
+              targetPort: 8443
+              protocol: TCP
+            selector:
+              app.kubernetes.io/name: kubernetes-dashboard-kong-proxy
 
-    - name: Установить Dashboard
-      command: >
-        helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard
-        --namespace {{ dashboard_namespace }} --create-namespace --wait
+    - name: Создать ServiceAccount для Dashboard
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: dashboard-admin
+            namespace: "{{ dashboard_namespace }}"
 
-    - name: Настроить NodePort
-      command: >
-        kubectl -n {{ dashboard_namespace }} patch svc kubernetes-dashboard-kong-proxy
-        -p '{"spec":{"type":"NodePort","ports":[{"port":443,"nodePort":{{ dashboard_nodeport }}}]}}'
+    - name: Создать ClusterRoleBinding для admin прав
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: dashboard-admin-binding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+          - kind: ServiceAccount
+            name: dashboard-admin
+            namespace: "{{ dashboard_namespace }}"
 
-    - name: Создать admin пользователя
-      command: kubectl -n {{ dashboard_namespace }} create serviceaccount dashboard-admin
-      ignore_errors: yes
+    - name: Установить kube-prometheus-stack
+      kubernetes.core.helm:
+        name: prometheus
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: "{{ monitoring_namespace }}"
+        create_namespace: true
+        values:
+          prometheus:
+            prometheusSpec:
+              serviceMonitorSelectorNilUsesHelmValues: false
+              podMonitorSelectorNilUsesHelmValues: false
+        state: present
 
-    - name: Дать права admin
-      command: >
-        kubectl create clusterrolebinding dashboard-admin-binding
-        --clusterrole=cluster-admin --serviceaccount={{ dashboard_namespace }}:dashboard-admin
-      ignore_errors: yes
+    - name: Определить публичный IP мастера
+      set_fact:
+        dashboard_public_ip: "{{ ansible_host }}"
 
-    - name: Получить токен
-      command: kubectl -n {{ dashboard_namespace }} create token dashboard-admin
-      register: token
+    - name: Проверить статус Dashboard
+      shell: |
+        echo "=== DASHBOARD ({{ dashboard_public_ip }}:{{ dashboard_nodeport }}) ==="
+        kubectl get svc -n {{ dashboard_namespace }} kubernetes-dashboard-kong-proxy -o wide || echo "Service not ready"
+      register: dashboard_status
+      changed_when: false
 
-    - name: Показать доступ
+    - name: Проверить статус Monitoring
+      shell: |
+        echo "=== MONITORING ==="
+        kubectl get pods -n {{ monitoring_namespace }} || echo "Namespace not ready"
+      register: monitoring_status
+      changed_when: false
+
+    - name: Получить токен Dashboard admin
+      shell: kubectl -n {{ dashboard_namespace }} create token dashboard-admin
+      register: dashboard_token
+      changed_when: false
+
+    - name: Показать результаты развертывания
       debug:
         msg:
-          - "Dashboard: https://{{ dashboard_host_ip }}:{{ dashboard_nodeport }}"
-          - "Token: {{ token.stdout }}"
+          - "РАЗВЁРТЫВАНИЕ ЗАВЕРШЕНО УСПЕШНО!"
+          - "KUBERNETES DASHBOARD:"
+          - "   URL: https://{{ dashboard_public_ip }}:{{ dashboard_nodeport }}"
+          - "   TOKEN: {{ dashboard_token.stdout }}"
+          - ""
+          - "MONITORING:"
+          - "   Namespace: {{ monitoring_namespace }}"
+          - "   Check: kubectl get all -n {{ monitoring_namespace }}"
+          - ""
+          - "{{ dashboard_status.stdout_lines }}"
+          - "{{ monitoring_status.stdout_lines }}"
+
+    - name: Сохранить информацию развертывания
+      copy:
+        content: |
+          # Kubernetes Dashboard & Monitoring
+          Master IP: {{ dashboard_public_ip }}
+          Dashboard: https://{{ dashboard_public_ip }}:{{ dashboard_nodeport }}
+          Token: {{ dashboard_token.stdout }}
+          
+          Monitoring Namespace: {{ monitoring_namespace }}
+          Status: kubectl get all -n {{ monitoring_namespace }}
+          
+          Grafana: kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
+        dest: /tmp/k8s-info.txt
+        mode: '0644'
