@@ -99,3 +99,6 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   ```bash
   kubectl get secret --namespace monitoring -l app.kubernetes.io/component=admin-secret -o jsonpath="{.items[0].data.admin-password}" | base64 --decode ; echo
   ```
+
+docker build -t my-horoscope-app .
+docker run -p 8080:80 my-horoscope-app
