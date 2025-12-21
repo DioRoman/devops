@@ -2,6 +2,7 @@
 
 - Перейти в каталог с конфигурацией:
   - `cd /mnt/c/Users/rlyst/Netology/devops/terraform/infrastructure`
+  - `cd /mnt/c/Users/rlyst/Netology/devops/terraform/cicd`
 - Инициализировать Terraform:
   - `terraform init`
 - Применить инфраструктуру (создать кластер):
@@ -24,7 +25,6 @@
 - Подключиться к кластеру локально:
   - `ansible-playbook -i inventories/hosts.yml localhost-connect-k8s-cluster.yml --ask-become-pass`
   
-
 ***
 
 ### Тестирование и отладка
@@ -102,3 +102,12 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 docker build -t my-horoscope-app .
 docker run -p 8080:80 my-horoscope-app
+
+Данные для GIT
+git config user.name "Ваше Имя"
+git config user.email "your.email@example.com"
+
+
+cd /mnt/c/Users/rlyst/Netology/devops/kubernetes/
+
+kubectl apply -f github-actions-sa.yml
