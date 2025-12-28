@@ -226,8 +226,6 @@
         mode: '0600'
       become: yes
 
-
-    # --- ВАЖНО: Теперь Calico!
     - name: Apply Calico CNI Plugin
       command:
         cmd: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
@@ -241,9 +239,18 @@
       command: kubeadm token create --print-join-command
       register: kubeadm_join_command
 
-    - name: Показать команду join для worker
+    - name: Показать команду join (скопируйте!)
       debug:
         msg: "{{ kubeadm_join_command.stdout }}"
+
+    - name: Сохранить команду join (для vault)
+      copy:
+        dest: "{{ playbook_dir }}/secrets/kubeadm-join.yml"
+        content: |
+          vault_kubeadm_join_command: "{{ kubeadm_join_command.stdout }}"
+      delegate_to: localhost
+      run_once: true
+      become: no
 
   handlers:
     - name: restart containerd

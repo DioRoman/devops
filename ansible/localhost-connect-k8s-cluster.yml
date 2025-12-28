@@ -6,8 +6,9 @@
   become: no
   
   vars:
-    master_ip: "89.169.150.50"
-    master_user: "ubuntu"
+    master_host: "{{ groups['K8S-master'][0] }}"  # Имя первого хоста из группы
+    master_ip: "{{ hostvars[master_host]['ansible_host'] }}"  # IP из inventory
+    master_user: "{{ hostvars[master_host]['ansible_user'] | default('ubuntu') }}"
     kube_dir: "/home/{{ ansible_user_id }}/.kube"
     kube_config: "{{ kube_dir }}/config"
     hosts_entry: "{{ master_ip }} k8s-master"

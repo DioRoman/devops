@@ -8,7 +8,7 @@ terraform {
       region="ru-central1"
 
       bucket     = "dio-bucket"
-      key = "terraform-learning/terraform.tfstate"
+      key = "terraform-learning/terraform-cicd.tfstate"
 
       skip_region_validation      = true
       skip_credentials_validation = true

@@ -1,0 +1,84 @@
+---
+- name: Setup Nginx Reverse Proxy on k8s-master
+  hosts: K8S-master
+  become: yes
+  vars:
+    nginx_proxy_port: 80
+    nginx_config_file: k8s-proxy
+  
+  tasks:
+    - name: 1. Update apt cache and install nginx
+      apt:
+        update_cache: yes
+        name: nginx
+        state: present
+
+    - name: 2. Remove old k8s configs
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/nginx/sites-available/k8s*
+        - /etc/nginx/sites-enabled/k8s*
+        - /etc/nginx/sites-enabled/default
+
+    - name: 3. Create nginx proxy config
+      template:
+        src: k8s-proxy.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_config_file }}"
+        mode: '0644'
+      notify: restart nginx
+
+    - name: 4. Enable proxy site
+      file:
+        src: "/etc/nginx/sites-available/{{ nginx_config_file }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_config_file }}"
+        state: link
+        force: yes
+
+    - name: 5. Test nginx config
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: 6. Fail if nginx config test failed
+      fail:
+        msg: "Nginx config test failed: {{ nginx_test.stderr }}"
+      when: nginx_test.rc != 0
+
+    - name: 7. Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    - name: 8. Wait for nginx to be ready
+      wait_for:
+        port: "{{ nginx_proxy_port }}"
+        host: 127.0.0.1
+        delay: 5
+        timeout: 30
+
+    - name: 9. Get ansible_host from inventory
+      set_fact:
+        master_public_ip: "{{ ansible_host }}"
+
+    - name: 10. Show nginx status
+      systemd:
+        name: nginx
+      register: nginx_status
+
+    - name: 11. Display success info
+      debug:
+        msg:
+          - "Nginx Proxy installed on {{ inventory_hostname }}!"
+          - "Public IP: {{ master_public_ip }}"
+          - "Access: http://{{ master_public_ip }}/"
+          - "Nginx Status: {{ nginx_status.status.ActiveState }}"
+          - "Logs: tail -f /var/log/nginx/access.log"
+
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted

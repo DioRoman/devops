@@ -45,3 +45,7 @@ terraform.rc
 
 # Crash log files
 crash.log
+
+kubeadm-join.yml
+commands.md
+key.json

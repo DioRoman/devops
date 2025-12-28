@@ -19,7 +19,7 @@
 - Установить master-узел:
   - `ansible-playbook -i inventories/hosts.yml install-master.yml`
 - Установить worker-узлы:
-  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token t2i8c1.enedg87zcpa2cpjc --discovery-token-ca-cert-hash sha256:7952fdb832b4a337a9f755956790005657c5d20b00d9e11e0fb6b78f4cfd6b58'"`
+  - `ansible-playbook -i inventories/hosts.yml install-node.yml --extra-vars "kube_join_command='kubeadm join k8s-master:6443 --token x7jsob.empth0t9m92aa1gk --discovery-token-ca-cert-hash sha256:f9d1618398a16ed32c6beae2ec27ff49b3ad0434dbfd27f1170db27248119718'"`
 - Установить dashboard:
   - `ansible-playbook -i inventories/hosts.yml dashboard.yml`
 - Подключиться к кластеру локально:
@@ -99,15 +99,3 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   ```bash
   kubectl get secret --namespace monitoring -l app.kubernetes.io/component=admin-secret -o jsonpath="{.items[0].data.admin-password}" | base64 --decode ; echo
   ```
-
-docker build -t my-horoscope-app .
-docker run -p 8080:80 my-horoscope-app
-
-Данные для GIT
-git config user.name "Ваше Имя"
-git config user.email "your.email@example.com"
-
-
-cd /mnt/c/Users/rlyst/Netology/devops/kubernetes/
-
-kubectl apply -f github-actions-sa.yml

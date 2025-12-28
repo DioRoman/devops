@@ -1,12 +1,17 @@
-- name: Установка и настройка Kubernetes worker-node (Ubuntu 24.04, containerd, Calico)
+- name: Установка и настройка Kubernetes worker-node
   hosts: K8S-nodes
   become: true
 
   vars:
-    kube_join_command: ""   # Передается через extra-vars или через set_fact после получения с master
+    kube_join_command: "{{ vault_kubeadm_join_command | default('') }}"
     ansible_user: ubuntu
 
   tasks:
+    - name: Загрузить зашифрованную команду join
+      include_vars:
+        file: "{{ playbook_dir }}/secrets/kubeadm-join.yml"
+      run_once: true
+
     - name: Установка базовых зависимостей
       apt:
         name:

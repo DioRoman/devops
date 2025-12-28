@@ -1,0 +1,10 @@
+all:
+  children:
+    K8S-master:
+      hosts:
+        ${join("\n        ", formatlist("k8s-server-%d:\n          ansible_host: %s\n          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n          ansible_python_interpreter: /usr/bin/python3.12\n          ansible_user: ubuntu", 
+          range(1, length(k8s_master_ips)+1), k8s_master_ips))}
+    K8S-nodes:
+      hosts:
+        ${join("\n        ", formatlist("kubernetes-node-%d:\n          ansible_host: %s\n          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n          ansible_user: ubuntu", 
+          range(1, length(k8s_node_ips)+1), k8s_node_ips))}

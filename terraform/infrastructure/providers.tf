@@ -24,19 +24,24 @@ terraform {
   }
 
   required_providers {
-    yandex = {
-      source = "yandex-cloud/yandex"
-      version = ">= 0.85.0"
+    local = {
+      source  = "hashicorp/local"
+      version = "2.5.3"  # Рабочая стабильная версия
     }
     template = {
       source  = "hashicorp/template"
-      version = ">=2"
+      version = "~> 2.2"
     }
     random = {
       source  = "hashicorp/random"
-      version = ">= 3.0.0"
+      version = "~> 3.7"
+    }
+    yandex = {
+      source  = "yandex-cloud/yandex"
+      version = ">= 0.85.0"
     }
   }
+  
   required_version = ">=1.8"
 }
 

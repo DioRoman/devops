@@ -105,7 +105,6 @@ module "k8s_node_d" {
   }  
 }
 
-
 # Инициализация 
 data "template_file" "kubernetes" {
   template = file("./kubernetes.yml")
@@ -117,4 +116,20 @@ data "template_file" "kubernetes" {
 # Получение id образа Ubuntu
 data "yandex_compute_image" "ubuntu" {
   family = var.vm_web_image_family
+}
+
+resource "local_file" "ansible_inventory" {
+  content = templatefile("${path.module}/templates/inventory.tmpl", {
+    k8s_master_ips = local.k8s_master_ips
+    k8s_node_ips   = local.k8s_node_ips
+  })
+  
+  filename = "${path.module}/../../ansible/inventories/hosts.yml"
+  
+  depends_on = [
+    module.k8s_master,
+    module.k8s_node_a,
+    module.k8s_node_b, 
+    module.k8s_node_d
+  ]
 }

@@ -16,7 +16,9 @@ resource "yandex_resourcemanager_folder_iam_member" "cicd_roles" {
   for_each = toset([
     "container-registry.images.pusher",
     "container-registry.images.scanner",
-    "functions.functionInvoker"
+    "functions.functionInvoker",
+    "container-registry.images.puller",
+    "container-registry.viewer"
   ])
   folder_id = var.folder_id
   role      = each.value

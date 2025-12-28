@@ -1,5 +1,5 @@
 ---
-- name: Установка Kubernetes Dashboard и Monitoring Stack (Оптимизировано)
+- name: Установка Kubernetes Dashboard и Monitoring Stack (Исправлено)
   hosts: K8S-master
   become: true
   gather_facts: yes
@@ -9,6 +9,7 @@
     dashboard_namespace: kubernetes-dashboard
     dashboard_nodeport: 30443
     monitoring_namespace: monitoring
+    grafana_nodeport: 30001 
 
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
@@ -46,15 +47,23 @@
         executable: /bin/bash
       changed_when: false
 
-    - name: Установить Kubernetes Dashboard
+    - name: Установить Kubernetes Dashboard с правильными настройками
       kubernetes.core.helm:
         name: kubernetes-dashboard
         chart_ref: kubernetes-dashboard/kubernetes-dashboard
         release_namespace: "{{ dashboard_namespace }}"
         create_namespace: true
+        values:
+          kongProxy:
+            enabled: true
+            service:
+              type: NodePort
+              nodePorts:
+                http: 30442  # HTTP порт (опционально)
+                https: "{{ dashboard_nodeport }}"  # HTTPS порт
         state: present
 
-    - name: Настроить NodePort для Dashboard
+    - name: Обновить NodePort сервис Kong-proxy с правильным селектором
       kubernetes.core.k8s:
         state: present
         definition:
@@ -63,15 +72,20 @@
           metadata:
             name: kubernetes-dashboard-kong-proxy
             namespace: "{{ dashboard_namespace }}"
+            labels:
+              app.kubernetes.io/name: kong-proxy
           spec:
             type: NodePort
             ports:
-            - port: 443
+            - name: https
+              port: 443
               nodePort: "{{ dashboard_nodeport }}"
               targetPort: 8443
               protocol: TCP
             selector:
-              app.kubernetes.io/name: kubernetes-dashboard-kong-proxy
+              app.kubernetes.io/name: kong
+              app.kubernetes.io/instance: kubernetes-dashboard
+              app.kubernetes.io/component: app
 
     - name: Создать ServiceAccount для Dashboard
       kubernetes.core.k8s:
@@ -100,34 +114,76 @@
             name: dashboard-admin
             namespace: "{{ dashboard_namespace }}"
 
-    - name: Установить kube-prometheus-stack
+    - name: Создать namespace monitoring
+      kubernetes.core.k8s:
+        name: "{{ monitoring_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+      become: true
+
+    - name: Установить kube-prometheus-stack с Grafana NodePort
       kubernetes.core.helm:
         name: prometheus
         chart_ref: prometheus-community/kube-prometheus-stack
         release_namespace: "{{ monitoring_namespace }}"
-        create_namespace: true
         values:
           prometheus:
             prometheusSpec:
               serviceMonitorSelectorNilUsesHelmValues: false
               podMonitorSelectorNilUsesHelmValues: false
+          grafana:
+            service:
+              type: NodePort
+            adminPassword: prom-operator
+        wait: true
+        timeout: "900s"
+
+    - name: Фиксировать Grafana NodePort
+      kubernetes.core.k8s:
         state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: prometheus-grafana
+            namespace: "{{ monitoring_namespace }}"
+            labels:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: prometheus
+          spec:
+            type: NodePort
+            ports:
+            - port: 80
+              targetPort: 3000
+              nodePort: "{{ grafana_nodeport }}"
+              protocol: TCP
+              name: http
+            selector:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: prometheus
+      become: true
 
     - name: Определить публичный IP мастера
       set_fact:
         dashboard_public_ip: "{{ ansible_host }}"
 
-    - name: Проверить статус Dashboard
+    - name: Проверить статус Dashboard (с endpoints)
       shell: |
         echo "=== DASHBOARD ({{ dashboard_public_ip }}:{{ dashboard_nodeport }}) ==="
-        kubectl get svc -n {{ dashboard_namespace }} kubernetes-dashboard-kong-proxy -o wide || echo "Service not ready"
+        echo "Service:"
+        kubectl get svc -n {{ dashboard_namespace }} kubernetes-dashboard-kong-proxy -o wide
+        echo "Endpoints:"
+        kubectl get endpoints kubernetes-dashboard-kong-proxy -n {{ dashboard_namespace }} -o wide
+        echo "Pods:"
+        kubectl get pods -n {{ dashboard_namespace }} -l app.kubernetes.io/name=kong
       register: dashboard_status
       changed_when: false
 
     - name: Проверить статус Monitoring
       shell: |
         echo "=== MONITORING ==="
-        kubectl get pods -n {{ monitoring_namespace }} || echo "Namespace not ready"
+        kubectl get pods -n {{ monitoring_namespace }}
       register: monitoring_status
       changed_when: false
 
@@ -136,32 +192,30 @@
       register: dashboard_token
       changed_when: false
 
-    - name: Показать результаты развертывания
+    - name: Получить публичный IP мастера
+      set_fact:
+        master_public_ip: "{{ ansible_host }}"
+
+    - name: Показать информацию о развертывании
       debug:
         msg:
-          - "РАЗВЁРТЫВАНИЕ ЗАВЕРШЕНО УСПЕШНО!"
-          - "KUBERNETES DASHBOARD:"
-          - "   URL: https://{{ dashboard_public_ip }}:{{ dashboard_nodeport }}"
-          - "   TOKEN: {{ dashboard_token.stdout }}"
-          - ""
-          - "MONITORING:"
-          - "   Namespace: {{ monitoring_namespace }}"
-          - "   Check: kubectl get all -n {{ monitoring_namespace }}"
-          - ""
-          - "{{ dashboard_status.stdout_lines }}"
-          - "{{ monitoring_status.stdout_lines }}"
+          - "  РАЗВЁРТЫВАНИЕ ЗАВЕРШЕНО УСПЕШНО!"
+          - "  GRAFANA (доступна извне):"
+          - "  URL: http://{{ master_public_ip }}:{{ grafana_nodeport }}"
+          - "  Логин: admin"
+          - "  Пароль: prom-operator"
+          - "  KUBERNETES DASHBOARD (доступен извне):"
+          - "  URL: https://{{ master_public_ip }}:{{ dashboard_nodeport }} (игнорируйте предупреждение о сертификате)"
+          - "  ТОКЕН (скопируйте ЦЕЛИКОМ одной строкой):"
+          - "  {{ dashboard_token.stdout }}"
+          - "  Namespace monitoring: {{ monitoring_namespace }}"
+          - "  Проверить статус:"
+          - "  kubectl get pods -n {{ monitoring_namespace }}"
+          - "  kubectl get svc -n {{ monitoring_namespace }} prometheus-grafana"
 
     - name: Сохранить информацию развертывания
       copy:
         content: |
-          # Kubernetes Dashboard & Monitoring
-          Master IP: {{ dashboard_public_ip }}
-          Dashboard: https://{{ dashboard_public_ip }}:{{ dashboard_nodeport }}
-          Token: {{ dashboard_token.stdout }}
-          
-          Monitoring Namespace: {{ monitoring_namespace }}
-          Status: kubectl get all -n {{ monitoring_namespace }}
-          
-          Grafana: kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
+         {{ dashboard_token.stdout }}
         dest: /tmp/k8s-info.txt
         mode: '0644'
