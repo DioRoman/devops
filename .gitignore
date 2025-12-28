@@ -49,3 +49,5 @@ crash.log
 kubeadm-join.yml
 commands.md
 key.json
+kubeconfig-full.yaml
+ansible/kubeconfig-full.yaml
