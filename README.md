@@ -2004,7 +2004,7 @@ kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/
 
 Переходим http://master-ip/ и видим наше работающее приложение!
 
-<img width="1039" height="1078" alt="Снимок экрана 2025-12-30 012757" src="https://github.com/user-attachments/assets/ba95dde6-af17-42db-8eba-43b23a7df8f7" />
+<img width="608" height="626" alt="Снимок экрана 2025-12-30 015041" src="https://github.com/user-attachments/assets/d9ed7c83-875e-4d19-b0f3-271252de5069" />
 
 <img width="848" height="580" alt="Снимок экрана 2025-12-30 012824" src="https://github.com/user-attachments/assets/4050f474-943c-470d-8dd3-913d989ae611" />
 
@@ -2049,6 +2049,6 @@ kubectl get pods -A
 
 <img width="2199" height="1064" alt="Снимок экрана 2025-12-30 014633" src="https://github.com/user-attachments/assets/3379a51e-43b5-4293-aaa2-df57321fc29b" />
 
-## Время выполнения: 5 минут.
+## Время выполнения деплоя после изменения: 5 минут.
 
 
