@@ -2,10 +2,7 @@
 - name: Setup Nginx Reverse Proxy on k8s-master
   hosts: K8S-master
   become: yes
-  vars:
-    nginx_proxy_port: 80
-    nginx_config_file: k8s-proxy
-  
+
   tasks:
     - name: 1. Update apt cache and install nginx
       apt:

@@ -4,13 +4,6 @@
   become: true
   gather_facts: yes
   
-  vars:
-    kubeconfig_path: /etc/kubernetes/admin.conf
-    dashboard_namespace: kubernetes-dashboard
-    dashboard_nodeport: 30443
-    monitoring_namespace: monitoring
-    grafana_nodeport: 30001 
-
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 

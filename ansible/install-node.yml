@@ -2,10 +2,6 @@
   hosts: K8S-nodes
   become: true
 
-  vars:
-    kube_join_command: "{{ vault_kubeadm_join_command | default('') }}"
-    ansible_user: ubuntu
-
   tasks:
     - name: Загрузить зашифрованную команду join
       include_vars:

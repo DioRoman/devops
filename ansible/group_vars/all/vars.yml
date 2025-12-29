@@ -1,3 +1,25 @@
 ---
 ansible_user: ubuntu
 ansible_python_interpreter: /usr/bin/python3.12
+
+kubeconfig_path: /etc/kubernetes/admin.conf
+dashboard_namespace: kubernetes-dashboard
+dashboard_nodeport: 30443
+monitoring_namespace: monitoring
+grafana_nodeport: 30001
+
+kube_control_plane_hostname: k8s-master
+kube_control_plane_ip: 10.0.1.10
+pod_network_cidr: 192.168.0.0/16  # Calico default
+
+nginx_proxy_port: 80
+nginx_config_file: k8s-proxy
+
+kube_join_command: "{{ vault_kubeadm_join_command | default('') }}"
+
+master_host: "{{ groups['K8S-master'][0] }}"  # Имя первого хоста из группы
+master_ip: "{{ hostvars[master_host]['ansible_host'] }}"  # IP из inventory
+master_user: "{{ hostvars[master_host]['ansible_user'] | default('ubuntu') }}"
+kube_dir: "/home/{{ ansible_user_id }}/.kube"
+kube_config: "{{ kube_dir }}/config"
+hosts_entry: "{{ master_ip }} k8s-master"

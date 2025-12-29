@@ -1,97 +1,115 @@
-Старт проекта
+# Развертывание K8s кластера и приложения
 
-Маленький кластер K8S для небольшого приложения 4 ноды (1 мастер)
+Инструкция по пошаговому развертыванию небольшого Kubernetes кластера (1 мастер + 3 воркера) в Yandex Cloud с CICD через GitHub Actions.
 
-1. Переходим в каталог с Terraform
-`cd /mnt/c/Users/rlyst/Netology/devops/terraform/infrastructure`
+## Предварительная подготовка
 
-2. Применяем
-`terraform apply -auto-approve`
+Перейдите в каталог с Terraform инфраструктурой и примените конфигурацию:
+```
+cd /mnt/c/Users/rlyst/Netology/devops/terraform/infrastructure
+terraform apply -auto-approve
+```
 
-1. Переходим в каталог с Terraform
-`cd /mnt/c/Users/rlyst/Netology/devops/terraform/cicd`
+Затем настройте CICD:
+```
+cd /mnt/c/Users/rlyst/Netology/devops/terraform/cicd
+terraform apply -auto-approve
+```
 
-2. Применяем
-`terraform apply -auto-approve`
+## Установка Kubernetes
 
-3. Переходим в каталог с Ansible
+Перейдите в каталог Ansible и установите мастер-ноду:
+```
+cd /mnt/c/Users/rlyst/Netology/devops/ansible
+ansible-playbook -i inventories/hosts.yml install-master.yml
+```
 
-`cd /mnt/c/Users/rlyst/Netology/devops/ansible`
+Зашифруйте команду join:
+```
+ansible-vault encrypt secrets/kubeadm-join.yml
+```
 
-4. Запускаем установку Master-ноды
+Установите воркеры:
+```
+ansible-playbook -i inventories/hosts.yml install-node.yml --ask-vault-pass
+```
 
-`ansible-playbook -i inventories/hosts.yml install-master.yml`
+Установите Dashboard и мониторинг:
+```
+ansible-playbook -i inventories/hosts.yml install-dashboard-monitoring.yml
+```
 
-5. Шифруем команду join
+**Доступ:**
+- Dashboard: `https://master-ip:30443`
+- Grafana: `http://master-ip:30001` (смените пароль после входа)[1]
 
-`ansible-vault encrypt secrets/kubeadm-join.yml`
+## Локальное подключение
 
-5. Запускаем установку и join 3 нод.
+Подключитесь к кластеру локально:
+```
+ansible-playbook -i inventories/hosts.yml localhost-connect-k8s-cluster.yml --ask-become-pass
+```
 
-`ansible-playbook -i inventories/hosts.yml install-node.yml --ask-vault-pass`
- 
-6. Устанавливаем Dashboard и мониторинг
+Установите NGINX прокси:
+```
+ansible-playbook -i inventories/hosts.yml install-nginx-proxy.yml
+```
 
-`ansible-playbook -i inventories/hosts.yml install-dashboard-monitoring.yml`
+## Настройка Container Registry
 
-https://master-ip:30443 - dashboard k8s
-
-http://master-ip:30001 - grafana (после входа меняем пароль)
-
-7. Подлючаемся к кластеру локально
-
-`ansible-playbook -i inventories/hosts.yml localhost-connect-k8s-cluster.yml --ask-become-pass`
-
-8. Запускаем nginx прокси
-
-`ansible-playbook -i inventories/hosts.yml install-nginx-proxy.yml`
-
-8. Предварительно создаем secret для доступа к Yandex Cloud Conteriner Registry под сервисным аккаунтом dio-cicd. Команда создает Service Account Key для Yandex Cloud IAM в формате JSON.
-
-`yc iam key create --service-account-name dio-cicd --output key.json`
-
-Повторно генерить необязательно
-
-9. Создаем Kubernetes Secret для авторизации подов в Yandex Container Registry.
+Создайте секрет для Yandex Container Registry (ycr-secret):
+```
+yc iam key create --service-account-name dio-cicd --output key.json
 
 kubectl create secret docker-registry ycr-secret \
   --docker-server=cr.yandex \
   --docker-username=json_key \
   --docker-password="$(cat key.json)" \
   --docker-email=my-sa-for-k8s@example.com
+```
 
-8. Deploy приложения в кластер
+## Деплой приложения
 
-`kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/app-deployment.yaml`
+Разверните приложение:
+```
+kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/app-deployment.yaml
+kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/app-service.yaml
+```
 
-`kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/app-service.yaml`
+Или сразу оба:
+```
+kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/
+```
 
-`kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/` - сразу оба
+## Настройка GitHub Actions CICD
 
-9. Настраиваем CICD
+Получите необходимые секреты для GitHub Workflow:
 
-Для работы Workflow GitHub Actions необходимо получить следующие токеты (секреты)
+**Статичные секреты (один раз):**
+- `YC_CLOUD_ID`
+- `YC_FOLDER_ID` 
+- `YC_REGISTRY_ID`
 
-YC_CLOUD_ID - один раз, получить просто.
-YC_FOLDER_ID - один раз, получить просто.
-YC_REGISTRY_ID - один раз, получить просто.
+**YC_SA_KEY:**
+```
+yc iam key create --service-account-id ajetshm48atdt72ukdlb --output sa-key.json
+cat sa-key.json | jq -c . | tr -d '\n\r'
+```
 
-YC_SA_KEY  - один раз, получаем набором команд:
+**KUBE_CONFIG_DATA:**
+```
+kubectl config view --raw > kubeconfig-full.yaml
+sed -i 's/k8s-master/89.169.128.245/g' kubeconfig-full.yaml
+base64 -w 0 kubeconfig-full.yaml | xclip -sel clip
+```
 
-  Создайте ключ
+## Проверка кластера
 
-  `yc iam key create --service-account-id ajetshm48atdt72ukdlb --output sa-key.json`
+```
+kubectl get nodes
+kubectl get pods -A
+```
 
-  Одна строка JSON (для GitHub Secret)
-
-  `cat sa-key.json | jq -c . | tr -d '\n\r'`
-
-KUBE_CONFIG_DATA - один раз, получаем набором команд:
-
-  `kubectl config view --raw > kubeconfig-full.yaml`
-
-  `sed -i 's/k8s-master/89.169.128.245/g' kubeconfig-full.yaml`
-
-  Base64 для GitHub Secret
-
-  `base64 -w 0 kubeconfig-full.yaml | xclip -sel clip`
+**Полезные команды для отладки:**[1]
+- Под: `kubectl run test-pod --image wbitt/network-multitool --rm -it -- sh`
+- Тест сервиса: `curl http://service-name` или `curl http://62.84.116.85`

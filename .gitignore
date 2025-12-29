@@ -51,3 +51,26 @@ commands.md
 key.json
 kubeconfig-full.yaml
 ansible/kubeconfig-full.yaml
+
+
+# Ansible
+*.retry
+.vault_pass
+secrets/.vault_pass
+secrets/kubeadm-join.yml
+
+# Kubeconfig
+*.kube/config
+admin.conf
+
+# Terraform (если есть)
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

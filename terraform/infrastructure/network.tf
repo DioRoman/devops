@@ -62,19 +62,6 @@ source = "git::https://github.com/DioRoman/ter-yandex-vpc-module.git?ref=a7c4bbb
         },
         {
           protocol    = "TCP"
-          from_port   = 30000
-          to_port     = 32767
-          description = "Kubernetes nodes ports"
-          cidr_blocks = ["0.0.0.0/0"]
-        },
-        {
-          protocol    = "TCP"
-          port        = 30080
-          description = "Kubernetes Dashboard"
-          cidr_blocks = ["0.0.0.0/0"]
-        },
-        {
-          protocol    = "TCP"
           port        = 30001
           description = "Grafana"
           cidr_blocks = ["0.0.0.0/0"]
