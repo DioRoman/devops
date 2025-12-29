@@ -2007,39 +2007,3 @@ kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/
 <img width="848" height="580" alt="Снимок экрана 2025-12-30 012824" src="https://github.com/user-attachments/assets/4050f474-943c-470d-8dd3-913d989ae611" />
 
 ## Общее время разворачивания кластера и приложения в нём: 15 минут!
-
-## Настройка GitHub Actions CICD
-
-Получите необходимые секреты для GitHub Workflow:
-
-**Статичные секреты (один раз):**
-- `YC_CLOUD_ID`
-- `YC_FOLDER_ID` 
-- `YC_REGISTRY_ID`
-
-**YC_SA_KEY:**
-```
-yc iam key create --service-account-id ajetshm48atdt72ukdlb --output sa-key.json
-cat sa-key.json | jq -c . | tr -d '\n\r'
-```
-
-**KUBE_CONFIG_DATA:**
-```
-kubectl config view --raw > kubeconfig-full.yaml
-sed -i 's/k8s-master/89.169.128.245/g' kubeconfig-full.yaml
-base64 -w 0 kubeconfig-full.yaml | xclip -sel clip
-```
-
-## Проверка кластера
-
-```
-kubectl get nodes
-kubectl get pods -A
-```
-
-**Полезные команды для отладки:**[1]
-- Под: `kubectl run test-pod --image wbitt/network-multitool --rm -it -- sh`
-- Тест сервиса: `curl http://service-name` или `curl http://62.84.116.85`
-
-## Общее время запуска приложения
-
