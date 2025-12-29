@@ -10,6 +10,8 @@ Ansible                  https://github.com/DioRoman/devops/blob/main/ansible/re
 
 Kubernetes               https://github.com/DioRoman/devops/blob/main/kubernetes/readme.md
 
+dio-app                  https://github.com/DioRoman/dio-app/blob/main/README.md
+
 ## Инструкция по пошаговому развертыванию небольшого Kubernetes кластера (1 мастер + 3 воркера) в Yandex Cloud с CICD через GitHub Actions.
 
 ## Предварительная подготовка
@@ -2007,3 +2009,46 @@ kubectl apply -f /mnt/c/Users/rlyst/Netology/devops/kubernetes/
 <img width="848" height="580" alt="Снимок экрана 2025-12-30 012824" src="https://github.com/user-attachments/assets/4050f474-943c-470d-8dd3-913d989ae611" />
 
 ## Общее время разворачивания кластера и приложения в нём: 15 минут!
+
+## Настройка GitHub Actions CICD
+
+Получите необходимые секреты для GitHub Workflow:
+
+**Статичные секреты (один раз):**
+- `YC_CLOUD_ID`
+- `YC_FOLDER_ID` 
+- `YC_REGISTRY_ID`
+
+**YC_SA_KEY:**
+```
+yc iam key create --service-account-id ajetshm48atdt72ukdlb --output sa-key.json
+cat sa-key.json | jq -c . | tr -d '\n\r'
+```
+
+**KUBE_CONFIG_DATA:**
+```
+kubectl config view --raw > kubeconfig-full.yaml
+sed -i 's/k8s-master/<master-ip>/g' kubeconfig-full.yaml
+base64 -w 0 kubeconfig-full.yaml | xclip -sel clip
+```
+
+## Проверка кластера
+
+```
+kubectl get nodes
+kubectl get pods -A
+```
+
+**Полезные команды для отладки:**
+- Под: `kubectl run test-pod --image wbitt/network-multitool --rm -it -- sh`
+- Тест сервиса: `curl http://service-name` или `curl http://62.84.116.85`
+
+Если внести в Github Actions secrets and variables правильные данные секретор, то деплой происходит успешно.
+
+<img width="1003" height="442" alt="Снимок экрана 2025-12-30 014738" src="https://github.com/user-attachments/assets/194735d7-475c-4ed2-8933-a39988c1fb7d" />
+
+<img width="2199" height="1064" alt="Снимок экрана 2025-12-30 014633" src="https://github.com/user-attachments/assets/3379a51e-43b5-4293-aaa2-df57321fc29b" />
+
+## Время выполнения: 5 минут.
+
+
