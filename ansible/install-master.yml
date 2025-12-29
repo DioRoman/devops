@@ -234,10 +234,6 @@
       command: kubeadm token create --print-join-command
       register: kubeadm_join_command
 
-    - name: Показать команду join (скопируйте!)
-      debug:
-        msg: "{{ kubeadm_join_command.stdout }}"
-
     - name: Сохранить команду join (для vault)
       copy:
         dest: "{{ playbook_dir }}/secrets/kubeadm-join.yml"
