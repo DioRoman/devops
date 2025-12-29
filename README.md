@@ -23,6 +23,8 @@ terraform apply -auto-approve
 ```
 Время выполнения: 1 минута.
 
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/infrastructure.md
+
 VM
 
 <img width="2467" height="451" alt="Снимок экрана 2025-12-30 005457" src="https://github.com/user-attachments/assets/abfb6a54-2cb3-4a28-87af-9c0534986e46" />
@@ -63,6 +65,8 @@ ansible-playbook -i inventories/hosts.yml install-master.yml
 ```
 Время выполнения: 3 минуты.
 
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/install-master.md
+
 Зашифруйте команду join:
 ```
 ansible-vault encrypt secrets/kubeadm-join.yml
@@ -72,8 +76,9 @@ ansible-vault encrypt secrets/kubeadm-join.yml
 ```
 ansible-playbook -i inventories/hosts.yml install-node.yml --ask-vault-pass
 ```
-
 Время выполнения: 3 минуты.
+
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/install-node.md
 
 Установите Dashboard и мониторинг:
 ```
@@ -92,6 +97,8 @@ ansible-playbook -i inventories/hosts.yml install-dashboard-monitoring.yml
 
 Время выполнения: 5 минут.
 
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/install-dashboard-monitoring.md
+
 ## Локальное подключение
 
 Подключитесь к кластеру локально:
@@ -101,12 +108,16 @@ ansible-playbook -i inventories/hosts.yml localhost-connect-k8s-cluster.yml --as
 
 Время выполнения: 1 минута.
 
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/localhost-connect-k8s-cluster.md
+
 Установите NGINX прокси, чтобы увидеть наше приложение на 80 порту:
 ```
 ansible-playbook -i inventories/hosts.yml install-nginx-proxy.yml
 ```
 
 Время выполнения: 1 минута.
+
+Пример лога: https://github.com/DioRoman/devops/blob/main/logs/install-nginx-proxy.md
 
 ## Настройка Container Registry
 
