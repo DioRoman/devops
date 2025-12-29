@@ -1,6 +1,16 @@
 # Развертывание K8s кластера и приложения
 
-Инструкция по пошаговому развертыванию небольшого Kubernetes кластера (1 мастер + 3 воркера) в Yandex Cloud с CICD через GitHub Actions.
+## Список всех readme.md
+
+
+
+
+
+
+
+
+
+## Инструкция по пошаговому развертыванию небольшого Kubernetes кластера (1 мастер + 3 воркера) в Yandex Cloud с CICD через GitHub Actions.
 
 ## Предварительная подготовка
 
@@ -113,3 +123,6 @@ kubectl get pods -A
 **Полезные команды для отладки:**[1]
 - Под: `kubectl run test-pod --image wbitt/network-multitool --rm -it -- sh`
 - Тест сервиса: `curl http://service-name` или `curl http://62.84.116.85`
+
+## Общее время запуска приложения
+
