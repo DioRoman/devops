@@ -45,19 +45,22 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         mkdir -p ~/.aws
+        
+        # Credentials
         cat > ~/.aws/credentials << EOF
         [default]
         aws_access_key_id = $AWS_ACCESS_KEY_ID
         aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
         EOF
         
+        # Config с правильным синтаксисом
         cat > ~/.aws/config << 'EOF'
         [default]
         region = ru-central1
         s3_force_path_style = true
         s3_us_east_1_region = ru-central1
-        endpoints.s3 = https://storage.yandexcloud.net
-        endpoints.dynamodb = https://docapi.serverless.yandexcloud.net/ru-central1/b1g2uh898q9ekgq43tfq/etns1jscufdghn2f5san
+        s3_endpoint = https://storage.yandexcloud.net
+        dynamodb_endpoint = https://docapi.serverless.yandexcloud.net/ru-central1/b1g2uh898q9ekgq43tfq/etns1jscufdghn2f5san
         EOF
 
     - name: Terraform Init
