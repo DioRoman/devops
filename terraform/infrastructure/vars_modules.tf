@@ -12,7 +12,7 @@ variable "k8s_master" {
     platform_id       = "standard-v3",
     cores             = 2,
     memory            = 4,
-    disk_size         = 10,
+    disk_size         = 20,
     role              = "k8s_master"    
   }])
 }
