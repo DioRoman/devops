@@ -38,34 +38,59 @@ jobs:
       run: |
         mkdir -p ~/.yandex
         echo "$YANDEX_SERVICE_ACCOUNT_JSON" > ~/.yandex/authorized_key.json
+        echo "Yandex SA key file created"
 
-    - name: Setup AWS config for Yandex S3 backend
+    - name: Create AWS credentials file
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
+        # Создаем папку .aws
         mkdir -p ~/.aws
         
-        # Credentials
+        # Создаем credentials файл
         cat > ~/.aws/credentials << EOF
         [default]
         aws_access_key_id = $AWS_ACCESS_KEY_ID
         aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
         EOF
         
-        # Config с правильным синтаксисом
-        cat > ~/.aws/config << 'EOF'
+        # Создаем config файл
+        cat > ~/.aws/config << EOF
         [default]
         region = ru-central1
         s3_force_path_style = true
-        s3_us_east_1_region = ru-central1
-        s3_endpoint = https://storage.yandexcloud.net
-        dynamodb_endpoint = https://docapi.serverless.yandexcloud.net/ru-central1/b1g2uh898q9ekgq43tfq/etns1jscufdghn2f5san
+        s3_use_arn_region = true
         EOF
+        
+        # Проверяем созданные файлы
+        echo "=== AWS Credentials ==="
+        cat ~/.aws/credentials
+        echo "=== AWS Config ==="
+        cat ~/.aws/config
+        echo "=== File permissions ==="
+        ls -la ~/.aws/
+
+    - name: Debug - List files
+      run: |
+        echo "=== Home directory ==="
+        ls -la ~/
+        echo "=== AWS directory ==="
+        ls -la ~/.aws/
+        echo "=== Yandex directory ==="
+        ls -la ~/.yandex/
 
     - name: Terraform Init
       working-directory: ${{ env.TERRAFORM_DIR }}
-      run: terraform init
+      env:
+        # Экспортируем переменные окружения для AWS
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: 'ru-central1'
+      run: |
+        echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+        echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+        terraform init -input=false
 
     - name: Terraform Format
       working-directory: ${{ env.TERRAFORM_DIR }}
@@ -78,6 +103,10 @@ jobs:
     - name: Terraform Plan
       id: plan
       working-directory: ${{ env.TERRAFORM_DIR }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: 'ru-central1'
       run: terraform plan -input=false -detailed-exitcode
       continue-on-error: true
 
@@ -101,4 +130,8 @@ jobs:
         github.event_name == 'push' &&
         steps.plan.outcome == 'success'
       working-directory: ${{ env.TERRAFORM_DIR }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: 'ru-central1'
       run: terraform apply -auto-approve -input=false
