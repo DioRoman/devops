@@ -74,3 +74,5 @@ terraform.tfvars
 .idea/
 *.swp
 *.swo
+
+hosts.yml
