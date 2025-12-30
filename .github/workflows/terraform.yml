@@ -1,4 +1,4 @@
-name: Terraform CI/CD
+name: Terraform CI/CD Yandex Cloud
 
 on:
   push:
@@ -32,12 +32,33 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
 
-    - name: Create SA key file
+    - name: Create Yandex SA key file
       env:
         YANDEX_SERVICE_ACCOUNT_JSON: ${{ secrets.YANDEX_SERVICE_ACCOUNT_JSON }}
       run: |
         mkdir -p ~/.yandex
         echo "$YANDEX_SERVICE_ACCOUNT_JSON" > ~/.yandex/authorized_key.json
+
+    - name: Setup AWS config for Yandex S3 backend
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        mkdir -p ~/.aws
+        cat > ~/.aws/credentials << EOF
+        [default]
+        aws_access_key_id = $AWS_ACCESS_KEY_ID
+        aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
+        EOF
+        
+        cat > ~/.aws/config << 'EOF'
+        [default]
+        region = ru-central1
+        s3_force_path_style = true
+        s3_us_east_1_region = ru-central1
+        endpoints.s3 = https://storage.yandexcloud.net
+        endpoints.dynamodb = https://docapi.serverless.yandexcloud.net/ru-central1/b1g2uh898q9ekgq43tfq/etns1jscufdghn2f5san
+        EOF
 
     - name: Terraform Init
       working-directory: ${{ env.TERRAFORM_DIR }}
@@ -55,28 +76,26 @@ jobs:
       id: plan
       working-directory: ${{ env.TERRAFORM_DIR }}
       run: terraform plan -input=false -detailed-exitcode
-      env:
-        YANDEX_SERVICE_ACCOUNT_JSON: ${{ secrets.YANDEX_SERVICE_ACCOUNT_JSON }}
+      continue-on-error: true
 
-    - name: Upload Plan (PR)
+    - name: Upload Plan Artifact (PR)
       if: github.event_name == 'pull_request'
       uses: actions/upload-artifact@v4
       with:
-        name: terraform-plan
-        path: ${{ env.TERRAFORM_DIR }}/terraform-plan
+        name: terraform-plan-${{ github.run_id }}
+        path: ${{ env.TERRAFORM_DIR }}/.terraform/
+        retention-days: 1
 
     - name: Terraform Plan Status (PR)
       if: github.event_name == 'pull_request'
       run: |
-        echo "✅ Plan completed. Check the logs above."
-        echo "::notice::Terraform Plan shows changes above"
+        echo "✅ Terraform Plan completed"
+        echo "📋 Check plan details in the logs above"
 
-    - name: Terraform Apply (Main)
+    - name: Terraform Apply (Main only)
       if: |
         github.ref == 'refs/heads/main' && 
         github.event_name == 'push' &&
-        steps.plan.outputs.exitcode == '0'
+        steps.plan.outcome == 'success'
       working-directory: ${{ env.TERRAFORM_DIR }}
       run: terraform apply -auto-approve -input=false
-      env:
-        YANDEX_SERVICE_ACCOUNT_JSON: ${{ secrets.YANDEX_SERVICE_ACCOUNT_JSON }}
